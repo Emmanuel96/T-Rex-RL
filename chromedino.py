@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+# Authors: Emmanuel and Nick
+# Description: T-Rex Bot game file, for use with Reinforcement Learning Capstone Project
 import os
 import random
 import threading
