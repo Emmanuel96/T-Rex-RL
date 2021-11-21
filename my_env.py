@@ -4,9 +4,12 @@
 # Description: T-Rex Bot game file, for use with Reinforcement Learning Capstone Project
 import os
 import random
-import threading
 
 import pygame
+
+import gym
+from gym.spaces import Discrete, Box
+import numpy as np
 
 pygame.init()
 
@@ -51,14 +54,122 @@ CLOUD = pygame.image.load(os.path.join("assets/Other", "Cloud.png"))
 
 BG = pygame.image.load(os.path.join("assets/Other", "Track.png"))
 
+import gym
+from gym.spaces import Discrete, Box
+import numpy as np
+
+class DinoEnv(gym.Env):
+    def __init__(self):
+
+        global X_POS, Y_POS, Y_POS_DUCK, JUMP_VEL, game_speed, x_pos_bg, y_pos_bg, points, obstacles
+        X_POS = 80
+        Y_POS = 310
+        Y_POS_DUCK = 340
+        JUMP_VEL = 8.5
+        self.clock = pygame.time.Clock()
+        self.player = Dinosaur()
+        self.cloud = Cloud()
+        game_speed = 20
+        x_pos_bg = 0
+        y_pos_bg = 380
+        points = 0
+        obstacles = []
+
+        self.action_space = Discrete(3)
+        spaces = {
+            'distance': Box(low = 0, high = 1100, shape = (1,)),
+            'y_pos': Box(low = 0, high = 600, shape = (1,)),
+            'obs': Box(low = 0, high = 600, shape = (1,)),
+            'game_speed': Box(low = 20, high = 100000, shape = (1,))
+        }
+        self.observation_space = gym.spaces.Dict(spaces)
+        self.state = [1100, 310, 0]
+    
+    def step(self, action):
+        min_distance = 1100
+        obs_y = 0
+        reward = 0
+        done = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                done = True
+
+        self.player.update(action)
+
+        if len(obstacles) == 0:
+            rand = random.randint(0, 2)
+            if rand == 0:
+                obstacles.append(SmallCactus(SMALL_CACTUS))
+            elif rand == 1:
+                obstacles.append(LargeCactus(LARGE_CACTUS))
+            elif rand == 2:
+                obstacles.append(Bird(BIRD))
+
+        for obstacle in obstacles:
+            obstacle.update()
+            obstacle.draw(SCREEN)
+            if self.player.dino_rect.colliderect(obstacle.rect):
+                pygame.time.delay(2000)
+                done = True
+            if obstacle.rect.x - self.player.dino_rect.x < min_distance - self.player.dino_rect.x:
+                min_distance = obstacle.rect.x - self.player.dino_rect.x
+                obs_y = obstacle.rect.y
+
+        self.cloud.update()
+
+        score()
+
+        self.clock.tick(30)
+        pygame.display.update()
+
+        if done == False:
+            reward = 1
+
+        self.state = [min_distance, obs_y, self.player.dino_rect.y, game_speed]
+        info = {}
+        return self.state, reward, done, info
+    
+    def render(self):
+        SCREEN.fill((255, 255, 255))
+        self.player.draw(SCREEN)
+        background()
+        self.cloud.draw(SCREEN)
+
+    def reset(self):
+        self.state = [1100, 310, 0]
+        self.player.dino_reset()
+        global game_speed, x_pos_bg, y_pos_bg, points, obstacles
+        clock = pygame.time.Clock()
+        cloud = Cloud()
+        game_speed = 20
+        x_pos_bg = 0
+        y_pos_bg = 380
+        points = 0
+        obstacles = []
+        return self.state
+
+def background():
+        global x_pos_bg, y_pos_bg
+        image_width = BG.get_width()
+        SCREEN.blit(BG, (x_pos_bg, y_pos_bg))
+        SCREEN.blit(BG, (image_width + x_pos_bg, y_pos_bg))
+        if x_pos_bg <= -image_width:
+            SCREEN.blit(BG, (image_width + x_pos_bg, y_pos_bg))
+            x_pos_bg = 0
+        x_pos_bg -= game_speed
+
+def score():
+        global points, game_speed
+        points += 1
+        if points % 100 == 0:
+            game_speed += 1
+        font = pygame.font.Font("freesansbold.ttf", 20)
+        text = font.render("Points: " + str(points), True, (0, 0, 0))
+        textRect = text.get_rect()
+        textRect.center = (1000, 40)
+        SCREEN.blit(text, textRect)
 
 class Dinosaur:
-
-    X_POS = 80
-    Y_POS = 310
-    Y_POS_DUCK = 340
-    JUMP_VEL = 8.5
-
     def __init__(self):
         self.duck_img = DUCKING
         self.run_img = RUNNING
@@ -69,13 +180,13 @@ class Dinosaur:
         self.dino_jump = False
 
         self.step_index = 0
-        self.jump_vel = self.JUMP_VEL
+        self.jump_vel = JUMP_VEL
         self.image = self.run_img[0]
         self.dino_rect = self.image.get_rect()
-        self.dino_rect.x = self.X_POS
-        self.dino_rect.y = self.Y_POS
+        self.dino_rect.x = X_POS
+        self.dino_rect.y = Y_POS
 
-    def update(self, userInput):
+    def update(self, action):
         if self.dino_duck:
             self.duck()
         if self.dino_run:
@@ -86,15 +197,15 @@ class Dinosaur:
         if self.step_index >= 10:
             self.step_index = 0
 
-        if (userInput[pygame.K_UP] or userInput[pygame.K_SPACE]) and not self.dino_jump:
+        if (action == 1) and not self.dino_jump:
             self.dino_duck = False
             self.dino_run = False
             self.dino_jump = True
-        elif userInput[pygame.K_DOWN] and not self.dino_jump:
+        elif action == 2 and not self.dino_jump:
             self.dino_duck = True
             self.dino_run = False
             self.dino_jump = False
-        elif not (self.dino_jump or userInput[pygame.K_DOWN]):
+        elif not (self.dino_jump or action == 2):
             self.dino_duck = False
             self.dino_run = True
             self.dino_jump = False
@@ -102,15 +213,15 @@ class Dinosaur:
     def duck(self):
         self.image = self.duck_img[self.step_index // 5]
         self.dino_rect = self.image.get_rect()
-        self.dino_rect.x = self.X_POS
-        self.dino_rect.y = self.Y_POS_DUCK
+        self.dino_rect.x = X_POS
+        self.dino_rect.y = Y_POS_DUCK
         self.step_index += 1
 
     def run(self):
         self.image = self.run_img[self.step_index // 5]
         self.dino_rect = self.image.get_rect()
-        self.dino_rect.x = self.X_POS
-        self.dino_rect.y = self.Y_POS
+        self.dino_rect.x = X_POS
+        self.dino_rect.y = Y_POS
         self.step_index += 1
 
     def jump(self):
@@ -118,13 +229,24 @@ class Dinosaur:
         if self.dino_jump:
             self.dino_rect.y -= self.jump_vel * 4
             self.jump_vel -= 0.8
-        if self.jump_vel < -self.JUMP_VEL:
+        if self.jump_vel < -JUMP_VEL:
             self.dino_jump = False
-            self.jump_vel = self.JUMP_VEL
+            self.jump_vel = JUMP_VEL
 
     def draw(self, SCREEN):
         SCREEN.blit(self.image, (self.dino_rect.x, self.dino_rect.y))
+    
+    def dino_reset(self):
+        self.dino_duck = False
+        self.dino_run = True
+        self.dino_jump = False
 
+        self.step_index = 0
+        self.jump_vel = JUMP_VEL
+        self.image = self.run_img[0]
+        self.dino_rect = self.image.get_rect()
+        self.dino_rect.x = X_POS
+        self.dino_rect.y = Y_POS
 
 class Cloud:
     def __init__(self):
@@ -141,7 +263,6 @@ class Cloud:
 
     def draw(self, SCREEN):
         SCREEN.blit(self.image, (self.x, self.y))
-
 
 class Obstacle:
     def __init__(self, image, type):
@@ -187,110 +308,3 @@ class Bird(Obstacle):
             self.index = 0
         SCREEN.blit(self.image[self.index // 5], self.rect)
         self.index += 1
-
-
-def main():
-    global game_speed, x_pos_bg, y_pos_bg, points, obstacles
-    run = True
-    clock = pygame.time.Clock()
-    player = Dinosaur()
-    cloud = Cloud()
-    game_speed = 20
-    x_pos_bg = 0
-    y_pos_bg = 380
-    points = 0
-    font = pygame.font.Font("freesansbold.ttf", 20)
-    obstacles = []
-    death_count = 0
-
-    def score():
-        global points, game_speed
-        points += 1
-        if points % 100 == 0:
-            game_speed += 1
-
-        text = font.render("Points: " + str(points), True, (0, 0, 0))
-        textRect = text.get_rect()
-        textRect.center = (1000, 40)
-        SCREEN.blit(text, textRect)
-
-    def background():
-        global x_pos_bg, y_pos_bg
-        image_width = BG.get_width()
-        SCREEN.blit(BG, (x_pos_bg, y_pos_bg))
-        SCREEN.blit(BG, (image_width + x_pos_bg, y_pos_bg))
-        if x_pos_bg <= -image_width:
-            SCREEN.blit(BG, (image_width + x_pos_bg, y_pos_bg))
-            x_pos_bg = 0
-        x_pos_bg -= game_speed
-
-    while run:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                run = False
-
-        SCREEN.fill((255, 255, 255))
-        userInput = pygame.key.get_pressed()
-
-        player.draw(SCREEN)
-        player.update(userInput)
-
-        if len(obstacles) == 0:
-            if random.randint(0, 2) == 0:
-                obstacles.append(SmallCactus(SMALL_CACTUS))
-            elif random.randint(0, 2) == 1:
-                obstacles.append(LargeCactus(LARGE_CACTUS))
-            elif random.randint(0, 2) == 2:
-                obstacles.append(Bird(BIRD))
-
-        for obstacle in obstacles:
-            obstacle.draw(SCREEN)
-            obstacle.update()
-            if player.dino_rect.colliderect(obstacle.rect):
-                pygame.time.delay(2000)
-                death_count += 1
-                menu(death_count)
-
-        background()
-
-        cloud.draw(SCREEN)
-        cloud.update()
-
-        score()
-
-        clock.tick(30)
-        pygame.display.update()
-
-
-def menu(death_count):
-    global points
-    run = True
-    while run:
-        SCREEN.fill((255, 255, 255))
-        font = pygame.font.Font("freesansbold.ttf", 30)
-
-        if death_count == 0:
-            text = font.render("Press any Key to Start", True, (0, 0, 0))
-        elif death_count > 0:
-            text = font.render("Press any Key to Restart", True, (0, 0, 0))
-            score = font.render("Your Score: " + str(points), True, (0, 0, 0))
-            scoreRect = score.get_rect()
-            scoreRect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
-            SCREEN.blit(score, scoreRect)
-        textRect = text.get_rect()
-        textRect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        SCREEN.blit(text, textRect)
-        SCREEN.blit(RUNNING[0], (SCREEN_WIDTH // 2 - 20, SCREEN_HEIGHT // 2 - 140))
-        pygame.display.update()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                run = False
-                pygame.display.quit()
-                pygame.quit()
-                exit()
-            if event.type == pygame.KEYDOWN:
-                main()
-
-
-t1 = threading.Thread(target=menu(death_count=0), daemon=True)
-t1.start()
