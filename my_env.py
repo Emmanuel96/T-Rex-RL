@@ -55,7 +55,7 @@ CLOUD = pygame.image.load(os.path.join("assets/Other", "Cloud.png"))
 BG = pygame.image.load(os.path.join("assets/Other", "Track.png"))
 
 import gym
-from gym.spaces import Discrete, Box
+from gym.spaces import Discrete, Box, Dict
 import numpy as np
 
 class DinoEnv(gym.Env):
@@ -76,13 +76,7 @@ class DinoEnv(gym.Env):
         obstacles = []
 
         self.action_space = Discrete(3)
-        spaces = {
-            'distance': Box(low = 0, high = 1100, shape = (1,)),
-            'y_pos': Box(low = 0, high = 600, shape = (1,)),
-            'obs': Box(low = 0, high = 600, shape = (1,)),
-            'game_speed': Box(low = 20, high = 100000, shape = (1,))
-        }
-        self.observation_space = gym.spaces.Dict(spaces)
+        self.observation_space = Box(low = 0, high = 10000, shape = (4,))
         self.state = [1100, 310, 0]
     
     def step(self, action):
