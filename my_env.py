@@ -76,18 +76,27 @@ class DinoEnv(gym.Env):
         obstacles = []
 
         self.action_space = Discrete(3)
-        self.observation_space = Box(low = 0, high = 10000, shape = (4,))
-        self.state = [1100, 310, 0]
+        spaces = {
+            'nearest_obs': Box(low = 0, high = 1100, shape = (1,)),
+            'obs_height': Box(low = 225, high = 320, shape = (1,)),
+            'dino_height': Box(low = 0, high = 350, shape = (1,)),
+            'high_bird': Discrete(2),
+            'gamespeed': Box(low = 15, high = 10000, shape = (1,))
+        }
+        self.observation_space = Dict(spaces)
+        self.state = [1100, 310, 0, 0, 20]
     
     def step(self, action):
         min_distance = 1100
         obs_y = 0
         reward = 0
         done = False
+        high_bird = 0
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 done = True
 
+        print(action)
         self.player.update(action)
 
         if len(obstacles) == 0:
@@ -100,14 +109,25 @@ class DinoEnv(gym.Env):
                 obstacles.append(Bird(BIRD))
 
         for obstacle in obstacles:
-            obstacle.update()
-            obstacle.draw(SCREEN)
+            reward = obstacle.update()
+            distance = obstacle.rect.x - (self.player.dino_rect.x + self.player.dino_rect.width)
             if self.player.dino_rect.colliderect(obstacle.rect):
-                pygame.time.delay(2000)
+                pygame.time.delay(100)
+                reward = -40
                 done = True
-            if obstacle.rect.x - self.player.dino_rect.x < min_distance - self.player.dino_rect.x:
-                min_distance = obstacle.rect.x - self.player.dino_rect.x
+            if distance < min_distance:
+                min_distance = distance 
                 obs_y = obstacle.rect.y
+                if obstacle.rect.y == 250:
+                    high_bird = 1
+
+        if min_distance >= 500 and action == 1:
+            reward = -100
+        elif 100 <= min_distance <= 130 and action == 1:
+            reward = 500
+        elif reward == 1 and action == 1:
+            reward = -5
+        
 
         self.cloud.update()
 
@@ -116,10 +136,7 @@ class DinoEnv(gym.Env):
         self.clock.tick(30)
         pygame.display.update()
 
-        if done == False:
-            reward = 1
-
-        self.state = [min_distance, obs_y, self.player.dino_rect.y, game_speed]
+        self.state = [min_distance, obs_y, self.player.dino_rect.y, high_bird, game_speed]
         info = {}
         return self.state, reward, done, info
     
@@ -128,9 +145,11 @@ class DinoEnv(gym.Env):
         self.player.draw(SCREEN)
         background()
         self.cloud.draw(SCREEN)
+        for obstacle in obstacles:
+            obstacle.draw(SCREEN)
 
     def reset(self):
-        self.state = [1100, 310, 0]
+        self.state = [1100, 310, 0, 0, 20]
         self.player.dino_reset()
         global game_speed, x_pos_bg, y_pos_bg, points, obstacles
         clock = pygame.time.Clock()
@@ -177,21 +196,15 @@ class Dinosaur:
         self.jump_vel = JUMP_VEL
         self.image = self.run_img[0]
         self.dino_rect = self.image.get_rect()
+        self.dino_rect.height -= 10
         self.dino_rect.x = X_POS
         self.dino_rect.y = Y_POS
 
     def update(self, action):
-        if self.dino_duck:
-            self.duck()
-        if self.dino_run:
-            self.run()
-        if self.dino_jump:
-            self.jump()
-
         if self.step_index >= 10:
             self.step_index = 0
 
-        if (action == 1) and not self.dino_jump:
+        if ((action == 1) and not self.dino_jump) and self.dino_rect.y >= 310:
             self.dino_duck = False
             self.dino_run = False
             self.dino_jump = True
@@ -203,6 +216,13 @@ class Dinosaur:
             self.dino_duck = False
             self.dino_run = True
             self.dino_jump = False
+
+        if self.dino_duck:
+            self.duck()
+        if self.dino_run:
+            self.run()
+        if self.dino_jump:
+            self.jump()
 
     def duck(self):
         self.image = self.duck_img[self.step_index // 5]
@@ -266,9 +286,12 @@ class Obstacle:
         self.rect.x = SCREEN_WIDTH
 
     def update(self):
+        reward = 1
         self.rect.x -= game_speed
         if self.rect.x < -self.rect.width:
             obstacles.pop()
+            reward = 5000
+        return reward
 
     def draw(self, SCREEN):
         SCREEN.blit(self.image[self.type], self.rect)
@@ -289,7 +312,7 @@ class LargeCactus(Obstacle):
 
 
 class Bird(Obstacle):
-    BIRD_HEIGHTS = [250, 290, 320]
+    BIRD_HEIGHTS = [225, 290, 320]
 
     def __init__(self, image):
         self.type = 0
