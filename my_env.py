@@ -79,12 +79,13 @@ class DinoEnv(gym.Env):
         spaces = {
             'nearest_obs': Box(low = 0, high = 1100, shape = (1,)),
             'obs_height': Box(low = 225, high = 320, shape = (1,)),
+            'obs_width': Box(low = 0, high = 200, shape = (1,)),
             'dino_height': Box(low = 0, high = 350, shape = (1,)),
             'high_bird': Discrete(2),
             'gamespeed': Box(low = 15, high = 10000, shape = (1,))
         }
         self.observation_space = Dict(spaces)
-        self.state = [1100, 310, 0, 0, 20]
+        self.state = [1100, 310, 0, 0, 0, 20]
     
     def step(self, action):
         min_distance = 1100
@@ -96,7 +97,6 @@ class DinoEnv(gym.Env):
             if event.type == pygame.QUIT:
                 done = True
 
-        print(action)
         self.player.update(action)
 
         if len(obstacles) == 0:
@@ -112,12 +112,13 @@ class DinoEnv(gym.Env):
             reward = obstacle.update()
             distance = obstacle.rect.x - (self.player.dino_rect.x + self.player.dino_rect.width)
             if self.player.dino_rect.colliderect(obstacle.rect):
-                pygame.time.delay(100)
+                pygame.time.delay(200)
                 reward = -40
                 done = True
             if distance < min_distance:
-                min_distance = distance 
+                min_distance = distance
                 obs_y = obstacle.rect.y
+                obs_width = obstacle.rect.width
                 if obstacle.rect.y == 250:
                     high_bird = 1
 
@@ -136,7 +137,7 @@ class DinoEnv(gym.Env):
         self.clock.tick(30)
         pygame.display.update()
 
-        self.state = [min_distance, obs_y, self.player.dino_rect.y, high_bird, game_speed]
+        self.state = [min_distance, obs_y, obs_width, self.player.dino_rect.y, high_bird, game_speed]
         info = {}
         return self.state, reward, done, info
     
@@ -149,7 +150,7 @@ class DinoEnv(gym.Env):
             obstacle.draw(SCREEN)
 
     def reset(self):
-        self.state = [1100, 310, 0, 0, 20]
+        self.state = [1100, 310, 0, 0, 0, 20]
         self.player.dino_reset()
         global game_speed, x_pos_bg, y_pos_bg, points, obstacles
         clock = pygame.time.Clock()
