@@ -44,10 +44,11 @@ def build_agent(model, actions):
     policy = EpsGreedyQPolicy(0.1)
     memory = SequentialMemory(limit = 1000000, window_length = 1)
     dqn = DQNAgent(model = model, memory = memory, policy = policy,
-        nb_actions = actions, nb_steps_warmup = 25, target_model_update = 0.5)
+        nb_actions = actions, nb_steps_warmup = 200, target_model_update = 0.5)
     return dqn
 
 
 
 if __name__ == "__main__":
+    # Mode
     load()
