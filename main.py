@@ -10,8 +10,20 @@ if __name__ == "__main__":
     
     if mode == 1:
         import QLearning
-        QLearning.load()
+        try:
+            n = int(input("How many episodes would you like to see? "))
+        except:
+            raise Exception("Must be a positive integer, please try again")
+        if 1 > n:
+            raise Exception("Must be a positive integer, please try again")
+        QLearning.load(n)
     elif mode == 2:
+        try:
+            n = int(input("How many steps of training would you like the model to take (minimum recommendation: 100000)? "))
+        except:
+            raise Exception("Must be a positive integer, please try again")
+        if 1 > n:
+            raise Exception("Must be a positive integer, please try again")
         import QLearning
         QLearning.train()
     else:

@@ -9,7 +9,7 @@ from rl.agents import DQNAgent
 from rl.policy import EpsGreedyQPolicy
 from rl.memory import SequentialMemory
 
-def train():
+def train(n = 10000):
     env = my_env.DinoEnv()
     states = 6
     actions = env.action_space.n
@@ -17,10 +17,10 @@ def train():
     model = build_model(states, actions, dense_layers = 4)
     dqn = build_agent(model, actions)
     dqn.compile(Adam(lr=0.01), metrics = ['mae'])
-    dqn.fit(env, nb_steps = 1000000, visualize = True, verbose = 1)
+    dqn.fit(env, nb_steps = n, visualize = True, verbose = 1)
     dqn.save_weights('dqn_weights2.h5f', overwrite = True)
 
-def load():
+def load(n = 15):
     env = my_env.DinoEnv()
     states = 6
     actions = env.action_space.n
@@ -29,7 +29,7 @@ def load():
     dqn = build_agent(model, actions)
     dqn.compile(Adam(lr=0.01), metrics = ['mae'])
     dqn.load_weights('dqn_weights.h5f')
-    dqn.test(env, nb_episodes = 10, visualize = True)
+    dqn.test(env, nb_episodes = n, visualize = True)
 
 def build_model(states, actions, dense_layers = 24, acti = 'relu'):
     model = Sequential()
